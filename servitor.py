@@ -44,34 +44,52 @@ import re
 #
 # client.listen()
 
+def getWikiText(searchTerm):
 
-searchTerm = "Cain"
-searchTerm = re.sub(" ", "%20", searchTerm)
-response = requests.get("http://wh40k.lexicanum.com/mediawiki/api.php?action=opensearch&search=" + searchTerm + "&limit=10&format=jsonfm")
+    searchTerm = re.sub(" ", "%20", searchTerm)
+    response = requests.get("http://wh40k.lexicanum.com/mediawiki/api.php?action=opensearch&search=" + searchTerm + "&limit=10&format=json")
+    data = json.loads(response.text)
+    searchTerm = data[1][0]
+
+    wikiText = getSummaryText(searchTerm)
+
+    while "redirect" in wikiText:
+        print("+++++ Redirecting +++++")
+        searchTerm = wikiText[12:]
+        searchTerm = searchTerm[:(len(searchTerm) - 2)]
+        wikiText = getSummaryText(searchTerm)
+    return wikiText
+
+
+def getSummaryText(searchTerm):
+    response = requests.get(
+        "http://wh40k.lexicanum.com/mediawiki/api.php?action=parse&page=" + searchTerm + "&format=json&prop=wikitext&section=0")
+    data = json.loads(response.text)
+    data = data.get('parse')
+    wikiText = data.get('wikitext')
+    wikiText = wikiText.get('*')
+    return wikiText
+
+def formatWikiText(wikiText):
+    while "{{" in wikiText:
+        part1 = wikiText.partition('{{')
+        part2 = part1[2].partition("}}")
+        wikiText = part1[0]+part2[2]
+
+    while "[[Image" in wikiText:
+        part1 = wikiText.partition('[[Image')
+        part2 = part1[2].partition("]]")
+        wikiText = part1[0]+part2[2]
+
+    wikiText = re.sub('\\[', '', wikiText)
+    wikiText = re.sub(']', '', wikiText)
+    wikiText = re.sub('\\\'', '', wikiText)
+    wikiText = re.sub('}', '', wikiText)
+    wikiText = re.sub('\\|', '', wikiText)
+    wikiText = re.sub('\\\n', '', wikiText)
+    return wikiText
 
 
 
-response = requests.get("http://wh40k.lexicanum.com/mediawiki/api.php?action=parse&page=Ciaphas_Cain&format=json&prop=wikitext&section=0")
-data = json.loads(response.text)
-data = data.get('parse')
-wikiText = data.get('wikitext')
-wikiText = wikiText.get('*')
-
-while "{{" in wikiText:
-    part1 = wikiText.partition('{{')
-    part2 = part1[2].partition("}}")
-    wikiText = part1[0]+part2[2]
-
-while "[[Image" in wikiText:
-    part1 = wikiText.partition('[[Image')
-    part2 = part1[2].partition("]]")
-    wikiText = part1[0]+part2[2]
-
-wikiText = re.sub('\\[', '', wikiText)
-wikiText = re.sub(']', '', wikiText)
-wikiText = re.sub('\\\'', '', wikiText)
-wikiText = re.sub('}', '', wikiText)
-wikiText = re.sub('\\|', '', wikiText)
-
-print(wikiText)
+print((formatWikiText(getWikiText("Cain"))))
 
